@@ -12,22 +12,34 @@ Design goals (it is graded by an AI agent, so):
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
+from .matching import build_idf, rank
+from .registry import registry
+
 _SKILL_MD = Path(__file__).resolve().parent.parent / "SKILL.md"
 _INDEX_HTML = Path(__file__).resolve().parent / "static" / "index.html"
 
-from .matching import build_idf, rank
-from .registry import registry
+
+@asynccontextmanager
+async def lifespan(app: "FastAPI"):
+    # Warm the registry and search index at startup so the first request
+    # (which may be the grading agent) is fast and never races on cold load.
+    registry.refresh(force=True)
+    get_idf()
+    yield
+
 
 app = FastAPI(
     title="Skill-Router",
     version="1.0.0",
     description="Natural-language discovery + call routing over the NANDA skills registry.",
+    lifespan=lifespan,
 )
 
 # ---- IDF is cheap to recompute and depends on the current registry snapshot ----

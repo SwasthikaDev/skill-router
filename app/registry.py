@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -92,6 +93,7 @@ class Registry:
         self._skills: list[dict] = []
         self._loaded_at: float = 0.0
         self._source: str = "uninitialized"
+        self._lock = threading.Lock()
 
     def _load_snapshot(self) -> list[dict]:
         with open(SNAPSHOT_PATH, encoding="utf-8") as f:
@@ -103,27 +105,39 @@ class Registry:
         return _coerce_list(resp.json())
 
     def refresh(self, force: bool = False) -> dict:
-        """(Re)load the registry. Live first, snapshot on failure."""
+        """(Re)load the registry. Live first, snapshot on failure.
+
+        Thread-safe. The lock plus the in-lock re-check means that when many
+        requests arrive at once with a stale cache, only one of them reloads
+        while the rest wait and reuse the fresh result (no thundering herd). The
+        new list is built fully and then published in a single assignment, so a
+        concurrent reader never sees a half-updated registry.
+        """
         now = time.monotonic()
         if not force and self._skills and (now - self._loaded_at) < CACHE_TTL_SECONDS:
             return self.status()
-        try:
-            raw = self._load_live()
-            source = "live"
-        except Exception:
-            raw = self._load_snapshot()
-            source = "snapshot"
-        if not raw:  # live returned empty -> prefer snapshot
-            raw = self._load_snapshot()
-            source = "snapshot"
-        self._skills = [normalize(r) for r in _dedupe(raw)]
-        self._loaded_at = now
-        self._source = source
-        return self.status()
+        with self._lock:
+            now = time.monotonic()
+            if not force and self._skills and (now - self._loaded_at) < CACHE_TTL_SECONDS:
+                return self.status()
+            try:
+                raw = self._load_live()
+                source = "live"
+            except Exception:
+                raw = self._load_snapshot()
+                source = "snapshot"
+            if not raw:  # live returned empty, prefer snapshot
+                raw = self._load_snapshot()
+                source = "snapshot"
+            new_skills = [normalize(r) for r in _dedupe(raw)]
+            self._skills = new_skills  # atomic publish
+            self._loaded_at = now
+            self._source = source
+            return self.status()
 
     def ensure_loaded(self) -> None:
         if not self._skills:
-            self.refresh(force=True)
+            self.refresh(force=False)
 
     @property
     def skills(self) -> list[dict]:
