@@ -15,10 +15,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 _SKILL_MD = Path(__file__).resolve().parent.parent / "SKILL.md"
+_INDEX_HTML = Path(__file__).resolve().parent / "static" / "index.html"
 
 from .matching import build_idf, rank
 from .registry import registry
@@ -118,11 +119,13 @@ class FindRequest(BaseModel):
 
 
 # --------------------------------- routes ---------------------------------
-@app.get("/", response_class=PlainTextResponse)
-def root() -> str:
-    return (
-        "Skill-Router — natural-language discovery + call routing over the NANDA skills registry.\n"
-        "No API key required. Start here: POST /find {\"need\": \"...\"}.  Docs: /skill.md  Health: /health\n"
+@app.get("/", include_in_schema=False)
+def root():
+    """Human/judge-facing landing page (UX4G light theme). Agents use /find + /skill.md."""
+    if _INDEX_HTML.exists():
+        return FileResponse(_INDEX_HTML, media_type="text/html")
+    return PlainTextResponse(
+        "Skill-Router — POST /find {\"need\": \"...\"}. Docs: /skill.md  Health: /health\n"
     )
 
 
