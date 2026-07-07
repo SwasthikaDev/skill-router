@@ -1,19 +1,23 @@
 # Skill-Router
 
-**Discovery is the bottleneck of the agent economy, and Skill-Router is the missing layer that fixes it.**
+**Give an agent a task in plain English; get back the right service and a call it can run right now.**
 
-As soon as there is more than a handful of agent services, no agent can hardcode
-which one does what. The human web solved this twice — DNS to find *hosts*, search
-engines to find *content*. The agent web has neither. Today an agent that needs to
-convert currency, verify a peer, or redact data has to already know the service and
-already know how to call it. That does not scale past a demo.
+The NANDA skills registry already lists dozens of agent services (currency
+conversion, identity checks, data redaction, and so on). But there is no way for an
+agent to *find* the right one at run time — it has to already know the service exists
+and already know how to call it. Skill-Router closes that gap.
 
-Skill-Router is the **discovery and routing layer**. An agent describes a need in
-plain words; Skill-Router searches the live [NANDA skills
-registry](https://nandatown.projectnanda.org/skills) and returns the best match
-*plus a ready-to-run call*. It turns "I need X" into an executable request in one
-hop. As the registry grows from dozens to thousands of skills, the agent's job stays
-the same: ask, get a call, run it.
+Send `POST /find` with a need like `"convert 100 USD to EUR"`. Skill-Router scores
+that need against every service in the live
+[registry](https://nandatown.projectnanda.org/skills) and returns the best matches.
+For the top match it also returns a **call plan**: the HTTP method, the URL, a
+paste-ready `curl`, and — when your need already contains the values — the URL with
+the placeholders filled in, so the call runs as-is. One request in, an executable
+call out.
+
+This is the same job DNS does for hosts and a search engine does for web pages:
+turn a name or a need into an address you can actually use. The agent web did not
+have this layer yet.
 
 Built for NANDAHack (Step 2). Agent-facing docs: [`SKILL.md`](./SKILL.md).
 
@@ -21,14 +25,17 @@ Built for NANDAHack (Step 2). Agent-facing docs: [`SKILL.md`](./SKILL.md).
 
 ## Why it matters (scale and importance)
 
-- **It is the compounding layer.** Every other agent service becomes more useful the
-  moment it is discoverable. A discovery layer is the thing that lets an agent
-  economy *compose* instead of being a pile of bespoke integrations.
-- **It removes the O(n) that kills growth.** Without it, every agent must know every
-  service — an N×M integration problem. With it, an agent knows one endpoint and can
-  reach all N services. That is the same shift DNS and API gateways brought.
-- **It is agent-native.** No human picks the service from a list; the agent does it
-  itself from a plain-language need, which is exactly what autonomous agents require.
+- **It removes hardcoded integrations.** Without a discovery layer, every agent has to
+  be pre-wired to every service it might call. That is an N-agents × M-services
+  problem: adding a service means updating agents. With Skill-Router, an agent calls
+  one endpoint (`/find`) and can reach any service in the registry, so new services
+  become usable without touching the agent.
+- **It composes the registry.** This is the same pattern as the NandaHack demo, where
+  one service uses another as a backend: Skill-Router is how an agent locates that
+  other service at run time instead of having its URL baked in.
+- **The agent does the lookup, not a human.** The input is a plain-language need and
+  the output is a runnable call, so an autonomous agent can go from intent to action
+  without anyone picking from a list.
 
 ## How it works
 
