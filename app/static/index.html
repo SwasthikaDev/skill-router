@@ -84,8 +84,13 @@
     .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
     .tag { font-size: 12px; color: var(--muted); background: var(--bg-alt); border: 1px solid var(--line);
       padding: 2px 8px; border-radius: 6px; }
+    .callhead { margin-top: 12px; }
+    .ready { font-size: 12px; font-weight: 700; color: var(--green); background: #e7f5ee;
+      padding: 3px 9px; border-radius: 999px; }
+    .tofill { font-size: 12px; font-weight: 700; color: #8a5a00; background: #fbf1dd;
+      padding: 3px 9px; border-radius: 999px; }
     pre { background: #14132a; color: #ece9ff; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
-      font-size: 13px; margin: 12px 0 0; position: relative; }
+      font-size: 13px; margin: 8px 0 0; position: relative; }
     pre code { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; white-space: pre; }
     .copy { position: absolute; top: 8px; right: 8px; font-size: 12px; font-weight: 600; color: #cfc8ff;
       background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 7px;
@@ -204,14 +209,16 @@
       results.innerHTML = data.results.map(r => {
         const call = r.call_plan && r.call_plan.suggested_first_call;
         const curl = call ? call.example_curl : '';
+        const ready = call && call.ready_to_run;
         const tags = (r.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
         const conf = r.confidence != null ? Math.round(r.confidence * 100) + '% match' : '';
         const md = r.call_plan && r.call_plan.skill_md_url;
+        const callLabel = call ? (ready ? '<span class="ready">Ready to run</span>' : '<span class="tofill">Fill in a value first</span>') : '';
         return `<article class="card">
           <h3>${esc(r.name)}</h3>
           <div class="meta">${conf ? `<span class="conf">${conf}</span>` : ''}<span class="why">${esc(r.why)}</span></div>
           <div class="tags">${tags}</div>
-          ${curl ? `<pre><button class="copy" type="button">Copy</button><code>${esc(curl)}</code></pre>` : ''}
+          ${curl ? `<div class="callhead">${callLabel}</div><pre><button class="copy" type="button">Copy</button><code>${esc(curl)}</code></pre>` : ''}
           ${md ? `<p style="margin:10px 0 0;font-size:14px"><a href="${esc(md)}" rel="noopener">Read this skill’s SKILL.md →</a></p>` : ''}
         </article>`;
       }).join('');

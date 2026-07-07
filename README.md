@@ -1,34 +1,37 @@
 # Skill-Router
 
-A discovery + routing service for the agent web. An AI agent describes what it
-needs in plain language; Skill-Router searches the live
-[NANDA skills registry](https://nandatown.projectnanda.org/skills) and returns
-the best-matching skills, each with a ready-to-run **call plan**. One hop from
-*"I need X"* to an executable call.
+Find the right agent skill for any task, in one call. An AI agent says what it
+needs in plain words, and Skill-Router searches the live
+[NANDA skills registry](https://nandatown.projectnanda.org/skills) and hands back
+the best matches. Each one comes with a call plan the agent can run right away. One
+hop from "I need X" to a real call.
 
-Built for **NANDAHack** (Step 2). The agent-facing docs live in
-[`SKILL.md`](./SKILL.md).
+Built for NANDAHack (Step 2). The agent-facing docs are in [`SKILL.md`](./SKILL.md).
 
-## Why it's different
+![Skill-Router landing page and live search](docs/screenshot.png)
 
-- **Solves a real gap:** the registry has dozens of skills but no way for an
-  agent to *find and call* the right one by intent. This is that missing layer.
-- **Never goes dark:** live registry with a bundled snapshot fallback
-  (`data/registry_snapshot.json`), so it answers even if upstream is down.
-- **Deterministic + zero-auth:** no API key, no LLM dependency in the hot path —
-  the same `need` always returns the same ranking, so an agent can verify and retry.
-- **Self-correcting errors:** every error response tells the caller how to fix it.
+## Why it stands out
 
-## Run locally
+- **It fills a real gap.** The registry has dozens of skills but no way for an agent
+  to find and call the right one by intent. This is that missing piece.
+- **It stays up.** Reads the live registry, but ships with a bundled snapshot
+  ([`data/registry_snapshot.json`](data/registry_snapshot.json)), so it still answers
+  if the upstream is down.
+- **It hands back a runnable call.** When your need has the values in it (like
+  "convert 100 USD to EUR"), it fills the endpoint placeholders and marks the call
+  `ready_to_run`.
+- **It's deterministic and needs no key.** No LLM in the hot path, so the same need
+  always returns the same ranking. Easy for an agent to verify and retry.
+- **Errors explain themselves.** Every error response says how to fix the call.
+
+## Run it locally
 
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate        # Windows: .venv\Scripts\activate  |  *nix: source .venv/bin/activate
+. .venv/Scripts/activate        # Windows: .venv\Scripts\activate   |   macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
-
-Then:
 
 ```bash
 curl -sS http://127.0.0.1:8000/health
@@ -37,7 +40,8 @@ curl -sS -X POST http://127.0.0.1:8000/find \
   -d '{"need": "convert 100 USD to EUR", "top_k": 3}'
 ```
 
-Interactive API docs at `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:8000/` for the landing page and live search, or `/docs` for
+the API docs.
 
 ## Endpoints
 
@@ -45,9 +49,9 @@ Interactive API docs at `http://127.0.0.1:8000/docs`.
 |---|---|---|
 | POST | `/find` | Search skills by natural-language need. |
 | GET | `/skills` | List every indexed skill. |
-| GET | `/skill/{id}` | Full detail + call plan for one skill. |
-| POST | `/refresh` | Force-reload the registry from upstream. |
-| GET | `/health` | Liveness + indexed-skill count. |
+| GET | `/skill/{id}` | Full detail and call plan for one skill. |
+| POST | `/refresh` | Reload the registry from upstream. |
+| GET | `/health` | Liveness and indexed-skill count. |
 | GET | `/skill.md` | The agent-facing SKILL.md. |
 
 ## Tests
@@ -57,25 +61,27 @@ pip install pytest
 pytest -q
 ```
 
-Tests are hermetic — they force the bundled snapshot, so no network is required.
+The tests force the bundled snapshot, so they run offline with no network.
 
 ## Deploy
 
-- **Render:** commit and connect the repo; `render.yaml` is included (free web
-  service, health check at `/health`).
-- **Railway / Fly / Vercel:** a `Procfile` is included
+- **Render:** connect the repo. `render.yaml` is included (free web service, health
+  check at `/health`).
+- **Railway, Fly, or others:** a `Procfile` is included
   (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`).
 
-After deploying, replace `https://YOUR-DEPLOYMENT-URL` in `SKILL.md` with your
-live host and submit `SKILL.md` at the NANDA skills page.
+After it's live, replace `https://YOUR-DEPLOYMENT-URL` in `SKILL.md` with your real
+host and submit `SKILL.md` on the NANDA skills page.
 
-## Layout
+## How it's laid out
 
 ```
 app/
-  main.py       FastAPI app + routes + call-plan builder
-  registry.py   live-registry loader with snapshot fallback + endpoint parser
-  matching.py   deterministic IDF-weighted relevance scoring (no external deps)
+  main.py       FastAPI app, routes, call-plan builder
+  registry.py   live-registry loader with snapshot fallback (thread-safe)
+  matching.py   deterministic IDF-weighted relevance scoring, no external deps
+  synth.py      fills endpoint placeholders from the need
+  static/       landing page and live search UI
 data/
   registry_snapshot.json   offline fallback copy of the registry
 tests/

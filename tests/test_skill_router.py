@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app import registry as reg_mod
 from app.matching import build_idf, rank
 from app.registry import parse_endpoints, registry
+from app.synth import fill_url
 
 
 @pytest.fixture(autouse=True)
@@ -52,6 +53,39 @@ def test_matching_is_deterministic():
     a = rank("verify an agent identity", registry.skills, idf, top_k=5)
     b = rank("verify an agent identity", registry.skills, idf, top_k=5)
     assert [r["skill"]["id"] for r in a] == [r["skill"]["id"] for r in b]
+
+
+# ---- call synthesis ----
+def test_fill_url_currency():
+    url = "https://api.example.com/latest?amount={amount}&from={from}&to={to}"
+    filled, ok, missing = fill_url("convert 100 USD to EUR", url)
+    assert ok is True
+    assert missing == []
+    assert "amount=100" in filled and "from=USD" in filled and "to=EUR" in filled
+
+
+def test_fill_url_reports_missing():
+    url = "https://api.example.com/x?amount={amount}&mode={mode}"
+    filled, ok, missing = fill_url("convert 50 USD", url)
+    assert ok is False
+    assert "mode" in missing
+    assert "amount=50" in filled
+
+
+def test_fill_url_no_placeholders():
+    url = "https://api.example.com/health"
+    filled, ok, missing = fill_url("anything", url)
+    assert filled == url and ok is True and missing == []
+
+
+def test_find_synthesizes_runnable_call(client):
+    r = client.post("/find", json={"need": "convert 100 USD to EUR", "top_k": 3})
+    body = r.json()
+    curr = next((x for x in body["results"] if "currency" in x["name"].lower()), None)
+    assert curr is not None
+    call = curr["call_plan"]["suggested_first_call"]
+    assert call["ready_to_run"] is True
+    assert "{" not in call["url"]  # no leftover placeholders
 
 
 # ---- endpoints ----

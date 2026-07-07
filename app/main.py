@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from .matching import build_idf, rank
 from .registry import registry
+from .synth import fill_url
 
 _SKILL_MD = Path(__file__).resolve().parent.parent / "SKILL.md"
 _INDEX_HTML = Path(__file__).resolve().parent / "static" / "index.html"
@@ -85,26 +86,33 @@ def _choose_primary(eps: list[dict]) -> dict | None:
     return (absolute or pool)[0]
 
 
-def _call_plan(skill: dict) -> dict:
+def _call_plan(skill: dict, need: str = "") -> dict:
     eps = skill["endpoints"]
     first = _choose_primary(eps)
+    suggested = None
+    if first:
+        url, filled, missing = fill_url(need, first["url"])
+        suggested = {
+            "method": first["method"],
+            "url": url,
+            "example_curl": _example_curl(first["method"], url),
+            "ready_to_run": filled,
+        }
+        if not filled and missing:
+            # Be honest about what still needs a value instead of pretending it's runnable.
+            suggested["fill_in"] = missing
+            suggested["note"] = (
+                "Replace the remaining {placeholders} using the schema in skill_md_url."
+            )
     return {
         "skill_md_url": skill["skill_md_url"],
         "read_this_first": "Fetch skill_md_url for exact request/response schemas before calling.",
         "endpoints": eps,
-        "suggested_first_call": (
-            {
-                "method": first["method"],
-                "url": first["url"],
-                "example_curl": _example_curl(first["method"], first["url"]),
-            }
-            if first
-            else None
-        ),
+        "suggested_first_call": suggested,
     }
 
 
-def _present(match: dict) -> dict:
+def _present(match: dict, need: str = "") -> dict:
     s = match["skill"]
     return {
         "id": s["id"],
@@ -120,7 +128,7 @@ def _present(match: dict) -> dict:
             if match["matched_terms"]
             else "Matched by overall relevance."
         ),
-        "call_plan": _call_plan(s),
+        "call_plan": _call_plan(s, need),
     }
 
 
@@ -188,7 +196,7 @@ def find(req: FindRequest) -> dict:
         "status": "ok",
         "need": need,
         "count": len(matches),
-        "results": [_present(m) for m in matches],
+        "results": [_present(m, need) for m in matches],
         "next_step": "Open results[0].call_plan.skill_md_url, then run "
         "results[0].call_plan.suggested_first_call.example_curl.",
     }
