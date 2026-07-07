@@ -6,7 +6,7 @@ back the best matches. Each match comes with a call plan you can run right away:
 the method, the URL, a paste-ready `curl`, and a link to that skill's own SKILL.md.
 So you go from "I need X" to an actual call in one hop, no directory browsing.
 
-- **Base URL:** `https://YOUR-DEPLOYMENT-URL` *(replace with your live host, e.g. `https://skill-router.onrender.com`)*
+- **Base URL:** `https://skill-router.onrender.com`
 - **Auth:** none. No API key, no signup. JSON in, JSON out.
 - **Stays up:** it reads the live registry but ships with a bundled snapshot, so it still answers if the upstream registry is down.
 
@@ -81,7 +81,7 @@ is `false` and a `fill_in` list tells you what's still needed.
 
 **curl**
 ```bash
-curl -sS -X POST https://YOUR-DEPLOYMENT-URL/find \
+curl -sS -X POST https://skill-router.onrender.com/find \
   -H 'Content-Type: application/json' \
   -d '{"need": "convert 100 USD to EUR", "top_k": 3}'
 ```
@@ -98,19 +98,19 @@ call again.
 Lists every indexed skill (`id`, `name`, `description`, `tags`, `reachable`,
 `skill_md_url`). Handy for browsing, or when `/find` comes back with `no_match`.
 ```bash
-curl -sS https://YOUR-DEPLOYMENT-URL/skills
+curl -sS https://skill-router.onrender.com/skills
 ```
 
 ### GET `/skill/{id}`
 Full record plus call plan for a single skill. Get the `id` from a `/find` or
 `/skills` result.
 ```bash
-curl -sS https://YOUR-DEPLOYMENT-URL/skill/a86da302-d2c3-4c47-a18f-7e11de3ba9ea
+curl -sS https://skill-router.onrender.com/skill/a86da302-d2c3-4c47-a18f-7e11de3ba9ea
 ```
 
 ### GET `/health`
 ```bash
-curl -sS https://YOUR-DEPLOYMENT-URL/health
+curl -sS https://skill-router.onrender.com/health
 # {"status":"ok","registry_source":"live","skills_indexed":30}
 ```
 
@@ -122,7 +122,7 @@ curl -sS https://YOUR-DEPLOYMENT-URL/health
 on your own. Go in order.
 
 ```bash
-BASE=https://YOUR-DEPLOYMENT-URL
+BASE=https://skill-router.onrender.com
 
 # 1. Check the router is up.
 curl -sS "$BASE/health"
