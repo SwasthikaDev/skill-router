@@ -169,6 +169,26 @@ def health() -> dict:
     }
 
 
+@app.get("/about")
+def about() -> dict:
+    """A self-describing manifest: what this service is, why it matters, and where to read more."""
+    return {
+        "name": "Skill-Router",
+        "one_line": "Describe a need in plain language; get the best-matching NANDA skill and a ready-to-run call.",
+        "problem": "The NANDA registry lists many agent services, but an agent has no way to find the "
+        "right one at run time. It has to already know the service exists and how to call it.",
+        "why_it_matters": "Without a discovery layer every agent must be pre-wired to every service "
+        "(an N-agents by M-services problem). Skill-Router lets an agent reach any registered service "
+        "through one endpoint, so new services become usable without changing the agent.",
+        "how_it_works": "POST /find scores your need against the live registry and returns ranked "
+        "matches, each with a runnable call plan (method, URL, paste-ready curl).",
+        "primary_endpoint": "POST /find",
+        "endpoints": ["POST /find", "GET /skills", "GET /skill/{id}", "GET /health"],
+        "skill_md": "/skill.md",
+        "source": "https://github.com/SwasthikaDev/skill-router",
+    }
+
+
 @app.post("/find")
 def find(req: FindRequest) -> dict:
     need = req.need.strip()

@@ -33,6 +33,7 @@ services and their docs.
 | GET | `/skill/{id}` | Full detail and call plan for one skill. |
 | POST | `/refresh` | Force a reload of the registry from upstream. |
 | GET | `/health` | Liveness plus how many skills are indexed. |
+| GET | `/about` | A short summary of what this service does and why, plus the source link. |
 | GET | `/skill.md` | This document. |
 
 ---
@@ -123,6 +124,9 @@ on your own. Go in order.
 
 ```bash
 BASE=https://skill-router.onrender.com
+
+# 0. Read a one-paragraph summary of what this service is and why it exists.
+curl -sS "$BASE/about"
 
 # 1. Check the router is up.
 curl -sS "$BASE/health"
