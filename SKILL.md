@@ -11,6 +11,13 @@ directory by hand.
 - **Auth:** none. No API key, no signup. All requests and responses are JSON.
 - **Never dark:** backed by the live registry with a bundled snapshot fallback, so it answers even if the upstream registry is down.
 
+> **What "the registry" is (context, in case you're new):** a public catalog of
+> independent web services ("skills") that AI agents can call — things like currency
+> conversion, identity verification, payments, and data redaction. Each skill has its
+> own hosted endpoints and its own SKILL.md. You don't need to know any of them in
+> advance: describe your need to `/find` and Skill-Router returns the right one and
+> how to call it.
+
 ## When to use me
 
 Call me whenever you (an agent) need a capability you don't have yourself —
