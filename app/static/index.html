@@ -110,6 +110,22 @@
     section.block > h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 6px; }
     section.block > p.sub { color: var(--muted); margin: 0; }
 
+    .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; margin-top: 16px; }
+    table.cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 560px; }
+    table.cmp th, table.cmp td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    table.cmp thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+    table.cmp thead th.new { color: var(--ux4g-primary-600); }
+    table.cmp td.dim { font-weight: 700; color: var(--ink); white-space: nowrap; }
+    table.cmp td.old { color: var(--muted); }
+    table.cmp td.new { color: var(--ink); background: var(--ux4g-primary-050); }
+    table.cmp tbody tr:last-child td { border-bottom: none; }
+    .kbd { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px;
+      background: var(--bg-alt); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+    .scale-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 14px; margin-top: 18px; }
+    .scale-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; background: #fff; }
+    .scale-card h3 { margin: 0 0 5px; font-size: 15px; }
+    .scale-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
     footer { border-top: 1px solid var(--line); margin-top: 52px; }
     .foot { max-width: 1060px; margin: 0 auto; padding: 22px 20px; color: var(--muted); font-size: 14px;
       display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
@@ -125,6 +141,8 @@
       <div class="brand"><span class="logo" aria-hidden="true">↳</span> Skill-Router</div>
       <nav aria-label="Primary">
         <a href="#how" class="hide-sm">How it works</a>
+        <a href="#compare" class="hide-sm">Compare</a>
+        <a href="#scale" class="hide-sm">Scale</a>
         <a href="/skill.md">SKILL.md</a>
         <a href="/docs">API</a>
         <a href="https://github.com/SwasthikaDev/skill-router" rel="noopener">GitHub</a>
@@ -173,11 +191,38 @@
       </div>
     </section>
 
-    <section class="block">
-      <h2>Built to be reliable</h2>
-      <p class="sub">Live registry with a bundled snapshot fallback, so it answers even if upstream is down ·
-        deterministic (same need → same ranking) · self-correcting error messages ·
-        <a href="/health">health check</a>.</p>
+    <section class="block" id="compare">
+      <h2>How it compares</h2>
+      <p class="sub">Without a router, an agent hardcodes endpoints or reads every skill's SKILL.md by hand.</p>
+      <div class="tablewrap">
+        <table class="cmp">
+          <thead><tr><th scope="col"></th><th scope="col">Hardcode / browse by hand</th><th scope="col" class="new">Skill-Router</th></tr></thead>
+          <tbody>
+            <tr><td class="dim">Find a capability</td><td class="old">Open each skill's SKILL.md and skim for a match</td><td class="new">One <span class="kbd">POST /find</span> with a plain-language need, ranked best first</td></tr>
+            <tr><td class="dim">Freshness</td><td class="old">Endpoints pinned last week may already be gone</td><td class="new">Reads the live NANDA registry on every query</td></tr>
+            <tr><td class="dim">The actual call</td><td class="old">Assemble the method, URL, and params yourself</td><td class="new">Returns a ready-to-run <span class="kbd">curl</span> with values filled in</td></tr>
+            <tr><td class="dim">Is it reachable?</td><td class="old">No idea until you call it and it fails</td><td class="new">Prefers reachable skills; optional live probe with <span class="kbd">verify:true</span></td></tr>
+            <tr><td class="dim">Repeatability</td><td class="old">Ad hoc, order-dependent</td><td class="new">Deterministic — same need, same ranking; safe to cache and retry</td></tr>
+            <tr><td class="dim">If the registry is down</td><td class="old">Discovery stops</td><td class="new">Falls back to a bundled snapshot and keeps answering</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="scale">
+      <h2>Built to scale</h2>
+      <p class="sub">Stateless, deterministic, and cache-friendly — the same properties that let DNS resolvers serve the whole internet.</p>
+      <div class="scale-grid">
+        <div class="scale-card"><h3>Stateless fleet</h3>
+          <p>No per-request state. Any node answers any <span class="kbd">/find</span>, so it sits behind a load balancer and autoscales on request volume — add or drop nodes freely.</p></div>
+        <div class="scale-card"><h3>Cheap per query</h3>
+          <p>Ranking is a deterministic IDF pass over an in-memory index of lean records, so a lookup is millisecond-scale. A large registry shards by tag or namespace.</p></div>
+        <div class="scale-card"><h3>Read-scale at the edge</h3>
+          <p><span class="kbd">/find</span> is idempotent and deterministic, so identical needs cache at a CDN or edge and never hit origin — the read-scaling DNS gets from TTL caching.</p></div>
+        <div class="scale-card"><h3>Graceful degradation</h3>
+          <p>A bundled snapshot backs the live registry, so an upstream outage degrades to slightly stale results instead of downtime. A keep-warm ping avoids cold starts.</p></div>
+      </div>
+      <p class="sub" style="margin-top:16px">Deterministic responses · self-correcting error messages · <a href="/health">health check</a> · no API key, no rate limits.</p>
     </section>
   </main>
 
