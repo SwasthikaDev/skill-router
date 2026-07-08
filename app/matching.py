@@ -102,6 +102,14 @@ def rank(need: str, skills: list[dict], idf: dict[str, float], top_k: int = 3) -
             score += 5.0  # verbatim phrase bonus
         if score <= 0:
             continue
+        # Prefer skills the registry reports as reachable. A soft nudge, not a hard
+        # filter: a much stronger match still wins, but among comparable matches the
+        # live one surfaces first, so an agent is steered toward a service that works.
+        reachable = s.get("reachable")
+        if reachable is True:
+            score += 2.0
+        elif reachable is False:
+            score -= 1.5
         results.append({"skill": s, "score": round(score, 3), "matched_terms": matched})
     results.sort(key=lambda r: (-r["score"], r["skill"]["name"].lower()))
     # Normalize to a 0-1 confidence for readability.

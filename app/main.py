@@ -14,7 +14,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
@@ -136,6 +138,24 @@ def _present(match: dict, need: str = "") -> dict:
 class FindRequest(BaseModel):
     need: str = Field(..., description="Plain-language description of what the agent needs.")
     top_k: int = Field(3, ge=1, le=10, description="How many skills to return.")
+    verify: bool = Field(
+        False,
+        description="If true, actively ping each result's host and rank the live ones first "
+        "(adds a 'live' field). Slower; off by default.",
+    )
+
+
+def _probe_live(url: str) -> bool | None:
+    """Ping a URL's host. True if it answered at all, False on connect/timeout, None if not a URL."""
+    if not url or not url.startswith(("http://", "https://")):
+        return None
+    parts = urlsplit(url)
+    base = f"{parts.scheme}://{parts.netloc}"
+    try:
+        httpx.get(base, timeout=3.0, follow_redirects=True)
+        return True  # any HTTP response means the host is up
+    except Exception:  # noqa: BLE001 - connect/timeout means not reachable
+        return False
 
 
 # --------------------------------- routes ---------------------------------
@@ -212,11 +232,19 @@ def find(req: FindRequest) -> dict:
             "'memory', 'privacy', 'negotiation'). GET /skills to browse everything.",
             "results": [],
         }
+    presented = [_present(m, need) for m in matches]
+    if req.verify:
+        for r in presented:
+            call = (r.get("call_plan") or {}).get("suggested_first_call") or {}
+            r["live"] = _probe_live(call.get("url", ""))
+        # Stable sort keeps score order within each group; live hosts float to the top.
+        presented.sort(key=lambda r: 0 if r.get("live") is True else (1 if r.get("live") is None else 2))
     return {
         "status": "ok",
         "need": need,
-        "count": len(matches),
-        "results": [_present(m, need) for m in matches],
+        "count": len(presented),
+        "verified_live": req.verify,
+        "results": presented,
         "next_step": "Open results[0].call_plan.skill_md_url, then run "
         "results[0].call_plan.suggested_first_call.example_curl.",
     }

@@ -154,6 +154,36 @@ def test_unknown_route(client):
     assert r.json()["error"] == "route_not_found"
 
 
+# ---- reachability-aware ranking ----
+def _mk(name: str, reachable, blob: str) -> dict:
+    return {
+        "id": name, "name": name, "description": "", "tags": [], "reachable": reachable,
+        "_blob": blob, "endpoints": [], "skill_md_url": None, "source_url": None,
+        "author": None, "created_at": None,
+    }
+
+
+def test_reachable_skill_ranks_above_unreachable():
+    live = _mk("live-pay", True, "payment pay money")
+    dead = _mk("dead-pay", False, "payment pay money")
+    skills = [dead, live]  # dead listed first; reachability should flip them
+    idf = build_idf(skills)
+    ranked = rank("payment", skills, idf, top_k=2)
+    assert ranked[0]["skill"]["name"] == "live-pay"
+
+
+def test_probe_live_ignores_non_urls():
+    from app.main import _probe_live
+    assert _probe_live("") is None
+    assert _probe_live("/relative/path") is None
+
+
+def test_find_verify_flag_shape(client):
+    r = client.post("/find", json={"need": "convert currency", "top_k": 1, "verify": False})
+    body = r.json()
+    assert body["verified_live"] is False  # default path unchanged, no probing
+
+
 def test_skill_md_served(client):
     r = client.get("/skill.md")
     assert r.status_code == 200

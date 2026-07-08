@@ -48,6 +48,13 @@ Search the registry by intent. This is the only call most agents need.
 ```
 - `need` (string, required): plain-language description of the task.
 - `top_k` (int, optional, default 3, range 1 to 10): how many matches to return.
+- `verify` (bool, optional, default false): if true, Skill-Router pings each result's
+  host and ranks the ones that answer first, adding a `live` field per result. Use it
+  when you want a service that is actually up right now. It is slower, so it is off by
+  default.
+
+Results already prefer skills the registry reports as reachable (each result has a
+`reachable` field), so you are steered toward services that work even without `verify`.
 
 **Response** (`status: "ok"`)
 ```json
