@@ -2,6 +2,8 @@
 
 **Give an agent a task in plain English; get back the right service and a call it can run right now.**
 
+**Live app → [skill-router.onrender.com](https://skill-router.onrender.com)** — open it in your browser and search. No signup, no API key. ([SKILL.md](https://raw.githubusercontent.com/SwasthikaDev/skill-router/main/SKILL.md) · [API docs](https://skill-router.onrender.com/docs))
+
 The NANDA skills registry already lists dozens of agent services (currency
 conversion, identity checks, data redaction, and so on). But there is no way for an
 agent to *find* the right one at run time — it has to already know the service exists
