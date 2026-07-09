@@ -6,7 +6,7 @@
   <title>Skill-Router — find the right agent skill in one call</title>
   <meta name="description" content="Discovery + call routing over the NANDA skills registry. An agent describes a need; Skill-Router returns the best skill and a ready-to-run call." />
   <style>
-    /* UX4G-aligned light theme: primary #4A2BC2, WCAG 2.1 AA contrast, system typography */
+    /* Accessible light theme: WCAG 2.1 AA contrast, system typography */
     :root {
       --ux4g-primary: #4A2BC2;
       --ux4g-primary-600: #3d21a6;
@@ -15,15 +15,15 @@
       --muted: #5a5a72;
       --line: #e3e1ee;
       --bg: #ffffff;
-      --bg-alt: #f7f6fc;
+      --bg-alt: #f8f9fc;
       --ok: #1f7a4d;
       --radius: 12px;
-      --shadow: 0 1px 2px rgba(27,27,43,.06), 0 8px 24px rgba(74,43,194,.06);
+      --shadow: 0 1px 2px rgba(27,27,43,.05), 0 12px 30px rgba(31,35,60,.08);
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      margin: 0; background: var(--bg); color: var(--ink);
+      margin: 0; background: linear-gradient(180deg, #fbfbff 0, #fff 360px); color: var(--ink);
       font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.55; font-size: 16px;
     }
@@ -33,7 +33,8 @@
     :focus-visible { outline: 3px solid var(--ux4g-primary); outline-offset: 2px; border-radius: 6px; }
 
     header {
-      border-bottom: 1px solid var(--line); background: #fff;
+      border-bottom: 1px solid rgba(227,225,238,.85); background: rgba(255,255,255,.92);
+      backdrop-filter: blur(14px);
       position: sticky; top: 0; z-index: 5;
     }
     .bar { max-width: 1060px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
@@ -42,7 +43,7 @@
       color: #fff; display: grid; place-items: center; font-size: 16px; }
     nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
     nav a { text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px;
-      padding: 8px 12px; border-radius: 8px; }
+      padding: 8px 12px; border-radius: 8px; transition: color .18s ease, background .18s ease; }
     nav a:hover { color: var(--ux4g-primary); background: var(--ux4g-primary-050); }
 
     main { max-width: 1060px; margin: 0 auto; padding: 20px; }
@@ -52,7 +53,7 @@
     h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1.1; letter-spacing: -.02em; margin: 16px 0 10px; }
     .lede { font-size: clamp(16px, 2.4vw, 19px); color: var(--muted); max-width: 60ch; margin: 0; }
 
-    .panel { background: var(--bg-alt); border: 1px solid var(--line); border-radius: var(--radius);
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
       padding: 22px; margin-top: 26px; box-shadow: var(--shadow); }
     .panel h2 { margin: 0 0 4px; font-size: 18px; }
     .panel p.hint { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
@@ -60,22 +61,24 @@
     label.sr { position: absolute; left: -999px; }
     input[type=text] {
       flex: 1 1 320px; min-width: 0; font-size: 16px; padding: 13px 14px; border-radius: 10px;
-      border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+      border: 1.5px solid var(--line); background: #fff; color: var(--ink); transition: border-color .18s ease, box-shadow .18s ease;
     }
     input[type=text]:focus { border-color: var(--ux4g-primary); outline: none; box-shadow: 0 0 0 3px var(--ux4g-primary-050); }
     button.cta {
       font-size: 15px; font-weight: 700; color: #fff; background: var(--ux4g-primary);
-      border: none; border-radius: 10px; padding: 13px 22px; cursor: pointer;
+      border: none; border-radius: 10px; padding: 13px 22px; cursor: pointer; transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+      box-shadow: 0 8px 18px rgba(74,43,194,.18);
     }
     button.cta:hover { background: var(--ux4g-primary-600); }
+    button.cta:active { transform: translateY(1px); }
     button.cta:disabled { opacity: .6; cursor: progress; }
     .chips { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .chip { font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--muted);
-      padding: 6px 11px; border-radius: 999px; cursor: pointer; }
-    .chip:hover { border-color: var(--ux4g-primary); color: var(--ux4g-primary); }
+      padding: 6px 11px; border-radius: 999px; cursor: pointer; transition: border-color .18s ease, color .18s ease, background .18s ease; }
+    .chip:hover { border-color: var(--ux4g-primary); color: var(--ux4g-primary); background: var(--ux4g-primary-050); }
 
     #results { margin-top: 18px; display: grid; gap: 14px; }
-    .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: 0 1px 2px rgba(27,27,43,.035); }
     .card h3 { margin: 0 0 4px; font-size: 17px; }
     .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
     .conf { font-size: 12px; font-weight: 700; color: var(--ux4g-primary-600);
@@ -85,7 +88,7 @@
     .tag { font-size: 12px; color: var(--muted); background: var(--bg-alt); border: 1px solid var(--line);
       padding: 2px 8px; border-radius: 6px; }
     .callhead { margin-top: 12px; }
-    .ready { font-size: 12px; font-weight: 700; color: var(--green); background: #e7f5ee;
+    .ready { font-size: 12px; font-weight: 700; color: var(--ok); background: #e7f5ee;
       padding: 3px 9px; border-radius: 999px; }
     .tofill { font-size: 12px; font-weight: 700; color: #8a5a00; background: #fbf1dd;
       padding: 3px 9px; border-radius: 999px; }
@@ -100,7 +103,7 @@
     .err { color: #a12; }
 
     .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 18px; }
-    .step { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    .step { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; background: #fff; box-shadow: 0 1px 2px rgba(27,27,43,.025); }
     .step .n { width: 28px; height: 28px; border-radius: 8px; background: var(--ux4g-primary-050);
       color: var(--ux4g-primary-600); font-weight: 800; display: grid; place-items: center; margin-bottom: 8px; }
     .step h3 { margin: 0 0 4px; font-size: 16px; }
@@ -110,7 +113,7 @@
     section.block > h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 6px; }
     section.block > p.sub { color: var(--muted); margin: 0; }
 
-    .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; margin-top: 16px; }
+    .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; margin-top: 16px; box-shadow: 0 1px 2px rgba(27,27,43,.025); }
     table.cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 560px; }
     table.cmp th, table.cmp td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
     table.cmp thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
@@ -122,7 +125,7 @@
     .kbd { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px;
       background: var(--bg-alt); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
     .scale-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 14px; margin-top: 18px; }
-    .scale-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; background: #fff; }
+    .scale-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; background: #fff; box-shadow: 0 1px 2px rgba(27,27,43,.025); }
     .scale-card h3 { margin: 0 0 5px; font-size: 15px; }
     .scale-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
 
@@ -131,7 +134,17 @@
       display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
     .foot a { color: var(--muted); }
     .foot .dot { opacity: .5; }
+    @media (max-width: 760px) {
+      .bar { align-items: flex-start; flex-direction: column; gap: 10px; }
+      nav { margin-left: 0; width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+      nav a { white-space: nowrap; }
+      .panel { padding: 18px; }
+      button.cta { width: 100%; }
+    }
     @media (max-width: 520px) { nav a.hide-sm { display: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -242,7 +255,7 @@
       <a href="/skill.md">SKILL.md</a><span class="dot">·</span>
       <a href="/docs">API docs</a><span class="dot">·</span>
       <a href="https://github.com/SwasthikaDev/skill-router" rel="noopener">Source</a><span class="dot">·</span>
-      <span>UI follows UX4G guidelines</span>
+      <span>Accessible, standards-aligned UI</span>
     </div>
   </footer>
 

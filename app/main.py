@@ -161,7 +161,7 @@ def _probe_live(url: str) -> bool | None:
 # --------------------------------- routes ---------------------------------
 @app.get("/", include_in_schema=False)
 def root():
-    """Human/judge-facing landing page (UX4G light theme). Agents use /find + /skill.md."""
+    """Human/judge-facing landing page. Agents use /find + /skill.md."""
     if _INDEX_HTML.exists():
         return FileResponse(_INDEX_HTML, media_type="text/html")
     return PlainTextResponse(
