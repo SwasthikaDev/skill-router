@@ -33,20 +33,39 @@ def _coerce_list(payload: Any) -> list[dict]:
     return []
 
 
-def parse_endpoints(raw: str | None) -> list[dict[str, str]]:
-    """Turn the free-text `endpoints` field into structured {method, url} entries."""
+def parse_endpoints(raw: Any) -> list[dict[str, str]]:
+    """Turn the free-text `endpoints` field into structured {method, url} entries.
+
+    Splits on newlines AND pipes (some records pack several endpoints on one line,
+    e.g. ``Base https://host | GET /a | POST /b``), tracks a base URL so a relative
+    path is resolved against it, and tolerates the field being a list rather than a
+    string.
+    """
     if not raw:
         return []
+    if isinstance(raw, list):
+        raw = "\n".join(str(x) for x in raw)
+    elif not isinstance(raw, str):
+        raw = str(raw)
     out: list[dict[str, str]] = []
-    for line in re.split(r"[\r\n]+", raw):
-        line = line.strip()
-        if not line:
+    base = ""
+    for seg in re.split(r"[\r\n|]+", raw):
+        seg = seg.strip()
+        if not seg:
             continue
-        m = _ENDPOINT_RE.search(line)
+        m = _ENDPOINT_RE.search(seg)
         if m:
-            out.append({"method": m.group(1).upper(), "url": m.group(2)})
-        elif line.startswith(("http://", "https://")):
-            out.append({"method": "GET", "url": line})
+            method, url = m.group(1).upper(), m.group(2)
+            if url.startswith("/") and base:
+                url = base.rstrip("/") + url
+            out.append({"method": method, "url": url})
+        elif seg.startswith(("http://", "https://")):
+            out.append({"method": "GET", "url": seg})
+            base = seg
+        else:
+            mm = re.search(r"https?://\S+", seg)  # e.g. a "Base https://host" label
+            if mm:
+                base = mm.group(0)
     return out
 
 
@@ -54,6 +73,10 @@ def normalize(record: dict) -> dict:
     """Normalize one registry record and precompute a lowercase search blob."""
     endpoints = parse_endpoints(record.get("endpoints"))
     tags = record.get("tags") or ""
+    if isinstance(tags, list):
+        tags = " ".join(str(t) for t in tags)
+    elif not isinstance(tags, str):
+        tags = str(tags)
     tag_list = [t.strip() for t in re.split(r"[,\s]+", tags) if t.strip()]
     name = record.get("name") or ""
     description = record.get("description") or ""
@@ -81,6 +104,8 @@ def _dedupe(records: list[dict]) -> list[dict]:
     """Collapse duplicate re-submissions (same name + source_url), keeping the newest."""
     best: dict[tuple, dict] = {}
     for r in records:
+        if not isinstance(r, dict):
+            continue
         key = ((r.get("name") or "").strip().lower(), (r.get("source_url") or "").strip().lower())
         prev = best.get(key)
         if prev is None or (r.get("created_at") or "") > (prev.get("created_at") or ""):
@@ -129,7 +154,14 @@ class Registry:
             if not raw:  # live returned empty, prefer snapshot
                 raw = self._load_snapshot()
                 source = "snapshot"
-            new_skills = [normalize(r) for r in _dedupe(raw)]
+            try:
+                new_skills = [normalize(r) for r in _dedupe(raw)]
+            except Exception:
+                # A malformed live record slipped past _coerce_list (e.g. a field of
+                # the wrong type). Fall back to the bundled snapshot rather than
+                # crashing the whole service — uptime is the priority.
+                new_skills = [normalize(r) for r in _dedupe(self._load_snapshot())]
+                source = "snapshot"
             self._skills = new_skills  # atomic publish
             self._loaded_at = now
             self._source = source
@@ -152,7 +184,7 @@ class Registry:
         return None
 
     def status(self) -> dict:
-        return {"source": self._source, "count": len(self._skills)}
+        return {"source": self._source, "count": len(self._skills), "loaded_at": self._loaded_at}
 
 
 registry = Registry()

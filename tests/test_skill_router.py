@@ -188,3 +188,37 @@ def test_skill_md_served(client):
     r = client.get("/skill.md")
     assert r.status_code == 200
     assert "Skill-Router" in r.text
+
+
+# ---- bug-fix regressions ----
+def test_parse_endpoints_pipe_and_base_resolution():
+    # S1: pipe-separated endpoints, with a "Base <url>" resolving the relative paths.
+    eps = parse_endpoints("Base https://cap.example.com | GET /api/challenge | POST /api/verify")
+    urls = {e["url"] for e in eps}
+    assert "https://cap.example.com/api/challenge" in urls
+    assert "https://cap.example.com/api/verify" in urls
+
+
+def test_fill_url_direction_reversed_phrasing():
+    # S2: "how many USD is 100 EUR" -> from=EUR, to=USD (not blindly positional).
+    url = "https://api.example.com/latest?amount={amount}&from={from}&to={to}"
+    filled, ok, _ = fill_url("how many USD is 100 EUR", url)
+    assert ok is True
+    assert "from=EUR" in filled and "to=USD" in filled
+    # And the normal phrasing still works.
+    filled2, ok2, _ = fill_url("convert 100 USD to EUR", url)
+    assert "from=USD" in filled2 and "to=EUR" in filled2
+
+
+def test_top_k_above_ten_is_clamped_not_rejected(client):
+    # S6: top_k > 10 must not 422; it is clamped.
+    r = client.post("/find", json={"need": "convert currency", "top_k": 50})
+    assert r.status_code == 200
+    assert len(r.json()["results"]) <= 25
+
+
+def test_confidence_never_negative(client):
+    # S4: confidence is clamped to >= 0 for every result.
+    r = client.post("/find", json={"need": "payment identity memory privacy", "top_k": 10})
+    for item in r.json().get("results", []):
+        assert item["confidence"] >= 0.0

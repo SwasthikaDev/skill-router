@@ -46,15 +46,18 @@ app = FastAPI(
 )
 
 # ---- IDF is cheap to recompute and depends on the current registry snapshot ----
-_idf_cache: dict = {"source": None, "count": 0, "idf": {}}
+_idf_cache: dict = {"key": None, "idf": {}}
 
 
 def get_idf() -> dict:
     status = registry.status()
-    if _idf_cache["count"] != status["count"] or _idf_cache["source"] != status["source"]:
+    # Key on loaded_at as well as count/source: a /refresh that changes skill
+    # content without changing the count (same N skills, edited) still advances
+    # loaded_at, so a stale IDF can never linger and skew the ranking.
+    key = (status["count"], status["source"], status.get("loaded_at"))
+    if _idf_cache["key"] != key:
         _idf_cache["idf"] = build_idf(registry.skills)
-        _idf_cache["count"] = status["count"]
-        _idf_cache["source"] = status["source"]
+        _idf_cache["key"] = key
     return _idf_cache["idf"]
 
 
@@ -137,7 +140,7 @@ def _present(match: dict, need: str = "") -> dict:
 # --------------------------------- models ---------------------------------
 class FindRequest(BaseModel):
     need: str = Field(..., description="Plain-language description of what the agent needs.")
-    top_k: int = Field(3, ge=1, le=10, description="How many skills to return.")
+    top_k: int = Field(3, ge=1, description="How many skills to return (values above 25 are clamped).")
     verify: bool = Field(
         False,
         description="If true, actively ping each result's host and rank the live ones first "
@@ -222,7 +225,7 @@ def find(req: FindRequest) -> dict:
             },
         )
     idf = get_idf()
-    matches = rank(need, registry.skills, idf, top_k=req.top_k)
+    matches = rank(need, registry.skills, idf, top_k=min(req.top_k, 25))
     if not matches:
         return {
             "status": "no_match",

@@ -110,11 +110,13 @@ def rank(need: str, skills: list[dict], idf: dict[str, float], top_k: int = 3) -
             score += 2.0
         elif reachable is False:
             score -= 1.5
+        if score <= 0:
+            continue  # the unreachable penalty sank an already-weak match; drop it
         results.append({"skill": s, "score": round(score, 3), "matched_terms": matched})
     results.sort(key=lambda r: (-r["score"], r["skill"]["name"].lower()))
-    # Normalize to a 0-1 confidence for readability.
+    # Normalize to a 0-1 confidence for readability (clamped so it never goes negative).
     if results:
         top = results[0]["score"]
         for r in results:
-            r["confidence"] = round(min(1.0, r["score"] / (top + 1e-9)), 3)
+            r["confidence"] = round(max(0.0, min(1.0, r["score"] / (top + 1e-9))), 3)
     return results[:top_k]

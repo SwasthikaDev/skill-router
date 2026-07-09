@@ -35,6 +35,35 @@ def _currencies(need: str) -> list[str]:
     return out
 
 
+def _directional_currencies(need: str) -> tuple[str | None, str | None]:
+    """Decide (from, to) from the phrasing, not just left-to-right order.
+
+    The currency next to the amount is the source; the currency after a
+    ``to``/``into``/``in`` marker is the target. So "how many USD is 100 EUR"
+    correctly reads as from=EUR, to=USD instead of the reversed from=USD.
+    Falls back to positional order when there is no directional cue.
+    """
+    ccys = _currencies(need)
+    if len(ccys) < 2:
+        return (ccys[0] if ccys else None, None)
+    known = {c.upper() for c in ccys}
+    low = need.lower()
+    from_ccy = to_ccy = None
+    m = re.search(r"\b\d+(?:\.\d+)?\s*([a-z]{3})\b", low)  # amount-adjacent = source
+    if m and m.group(1).upper() in known:
+        from_ccy = m.group(1).upper()
+    m2 = re.search(r"\b(?:to|into|in)\s+([a-z]{3})\b", low)  # after to/into/in = target
+    if m2 and m2.group(1).upper() in known and m2.group(1).upper() != from_ccy:
+        to_ccy = m2.group(1).upper()
+    if from_ccy and not to_ccy:
+        to_ccy = next((c for c in ccys if c != from_ccy), None)
+    elif to_ccy and not from_ccy:
+        from_ccy = next((c for c in ccys if c != to_ccy), None)
+    elif not from_ccy and not to_ccy:
+        from_ccy, to_ccy = ccys[0], ccys[1]
+    return from_ccy, to_ccy
+
+
 def fill_url(need: str, url: str) -> tuple[str, bool, list[str]]:
     """Return (url, fully_filled, unfilled_placeholders)."""
     names = _PLACEHOLDER.findall(url)
@@ -42,9 +71,7 @@ def fill_url(need: str, url: str) -> tuple[str, bool, list[str]]:
         return url, True, []
 
     numbers = _NUMBER.findall(need)
-    ccys = _currencies(need)
-    from_ccy = ccys[0] if len(ccys) >= 1 else None
-    to_ccy = ccys[1] if len(ccys) >= 2 else None
+    from_ccy, to_ccy = _directional_currencies(need)
 
     filled = url
     missing: list[str] = []
