@@ -149,12 +149,12 @@ class FindRequest(BaseModel):
     )
     reliability: bool = Field(
         False,
-        description="If true, cross-check each result against AgentPulse (the liveness oracle) and "
-        "add an 'agentpulse' field {live, uptime_pct}, ranking proven-live agents first.",
+        description="If true, cross-check each result against CipherWatch (the liveness oracle) and "
+        "add a 'cipherwatch' field {live, uptime_pct}, ranking proven-live agents first.",
     )
     only_live: bool = Field(
         False,
-        description="With reliability=true, drop results AgentPulse reports as not live.",
+        description="With reliability=true, drop results CipherWatch reports as not live.",
     )
 
 
@@ -171,18 +171,18 @@ def _probe_live(url: str) -> bool | None:
         return False
 
 
-# --- AgentPulse: the liveness oracle. We ask it which agents are actually alive ---
-# so /find can route to reliable ones. Best-effort: if AgentPulse is unreachable,
+# --- CipherWatch: the liveness oracle. We ask it which agents are actually alive ---
+# so /find can route to reliable ones. Best-effort: if CipherWatch is unreachable,
 # Skill-Router degrades gracefully and returns results without reliability info.
-AGENTPULSE_URL = "https://agentpulse.swasthikadevadiga2.workers.dev/agents"
-_agentpulse_cache: dict = {"at": 0.0, "map": {}}
+AGENTPULSE_URL = "https://cipherwatch.swasthikadevadiga2.workers.dev/agents"
+_cipherwatch_cache: dict = {"at": 0.0, "map": {}}
 
 
-def _agentpulse_map() -> dict:
-    """{lowercase agent name: {live, uptime_pct}} from AgentPulse, cached 60s."""
+def _cipherwatch_map() -> dict:
+    """{lowercase agent name: {live, uptime_pct}} from CipherWatch, cached 60s."""
     now = time.monotonic()
-    if _agentpulse_cache["map"] and (now - _agentpulse_cache["at"]) < 60:
-        return _agentpulse_cache["map"]
+    if _cipherwatch_cache["map"] and (now - _cipherwatch_cache["at"]) < 60:
+        return _cipherwatch_cache["map"]
     try:
         resp = httpx.get(AGENTPULSE_URL, timeout=4.0)
         resp.raise_for_status()
@@ -191,11 +191,11 @@ def _agentpulse_map() -> dict:
             name = (a.get("name") or "").strip().lower()
             if name:
                 out[name] = {"live": a.get("up"), "uptime_pct": a.get("uptime_pct")}
-        _agentpulse_cache["map"] = out
-        _agentpulse_cache["at"] = now
+        _cipherwatch_cache["map"] = out
+        _cipherwatch_cache["at"] = now
         return out
-    except Exception:  # noqa: BLE001 - AgentPulse is an optional enhancement, never a hard dep
-        return _agentpulse_cache["map"] or {}
+    except Exception:  # noqa: BLE001 - CipherWatch is an optional enhancement, never a hard dep
+        return _cipherwatch_cache["map"] or {}
 
 
 # --------------------------------- routes ---------------------------------
@@ -280,22 +280,22 @@ def find(req: FindRequest) -> dict:
         # Stable sort keeps score order within each group; live hosts float to the top.
         presented.sort(key=lambda r: 0 if r.get("live") is True else (1 if r.get("live") is None else 2))
     if req.reliability:
-        amap = _agentpulse_map()
+        amap = _cipherwatch_map()
         for r in presented:
             info = amap.get((r.get("name") or "").strip().lower())
-            r["agentpulse"] = (
-                {"live": info["live"], "uptime_pct": info["uptime_pct"], "source": "agentpulse"}
+            r["cipherwatch"] = (
+                {"live": info["live"], "uptime_pct": info["uptime_pct"], "source": "cipherwatch"}
                 if info
-                else {"live": None, "uptime_pct": None, "source": "agentpulse", "note": "not tracked by AgentPulse"}
+                else {"live": None, "uptime_pct": None, "source": "cipherwatch", "note": "not tracked by CipherWatch"}
             )
         if req.only_live:
-            live = [r for r in presented if (r.get("agentpulse") or {}).get("live") is True]
-            presented = live or presented  # never return empty if AgentPulse had no data
+            live = [r for r in presented if (r.get("cipherwatch") or {}).get("live") is True]
+            presented = live or presented  # never return empty if CipherWatch had no data
         # proven-live first, unknown next, confirmed-dead last
         presented.sort(
             key=lambda r: 0
-            if (r.get("agentpulse") or {}).get("live") is True
-            else (2 if (r.get("agentpulse") or {}).get("live") is False else 1)
+            if (r.get("cipherwatch") or {}).get("live") is True
+            else (2 if (r.get("cipherwatch") or {}).get("live") is False else 1)
         )
     return {
         "status": "ok",
