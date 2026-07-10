@@ -12,6 +12,7 @@ Design goals (it is graded by an AI agent, so):
 """
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -146,6 +147,15 @@ class FindRequest(BaseModel):
         description="If true, actively ping each result's host and rank the live ones first "
         "(adds a 'live' field). Slower; off by default.",
     )
+    reliability: bool = Field(
+        False,
+        description="If true, cross-check each result against AgentPulse (the liveness oracle) and "
+        "add an 'agentpulse' field {live, uptime_pct}, ranking proven-live agents first.",
+    )
+    only_live: bool = Field(
+        False,
+        description="With reliability=true, drop results AgentPulse reports as not live.",
+    )
 
 
 def _probe_live(url: str) -> bool | None:
@@ -159,6 +169,33 @@ def _probe_live(url: str) -> bool | None:
         return True  # any HTTP response means the host is up
     except Exception:  # noqa: BLE001 - connect/timeout means not reachable
         return False
+
+
+# --- AgentPulse: the liveness oracle. We ask it which agents are actually alive ---
+# so /find can route to reliable ones. Best-effort: if AgentPulse is unreachable,
+# Skill-Router degrades gracefully and returns results without reliability info.
+AGENTPULSE_URL = "https://agentpulse.swasthikadevadiga2.workers.dev/agents"
+_agentpulse_cache: dict = {"at": 0.0, "map": {}}
+
+
+def _agentpulse_map() -> dict:
+    """{lowercase agent name: {live, uptime_pct}} from AgentPulse, cached 60s."""
+    now = time.monotonic()
+    if _agentpulse_cache["map"] and (now - _agentpulse_cache["at"]) < 60:
+        return _agentpulse_cache["map"]
+    try:
+        resp = httpx.get(AGENTPULSE_URL, timeout=4.0)
+        resp.raise_for_status()
+        out = {}
+        for a in resp.json().get("agents", []):
+            name = (a.get("name") or "").strip().lower()
+            if name:
+                out[name] = {"live": a.get("up"), "uptime_pct": a.get("uptime_pct")}
+        _agentpulse_cache["map"] = out
+        _agentpulse_cache["at"] = now
+        return out
+    except Exception:  # noqa: BLE001 - AgentPulse is an optional enhancement, never a hard dep
+        return _agentpulse_cache["map"] or {}
 
 
 # --------------------------------- routes ---------------------------------
@@ -242,11 +279,30 @@ def find(req: FindRequest) -> dict:
             r["live"] = _probe_live(call.get("url", ""))
         # Stable sort keeps score order within each group; live hosts float to the top.
         presented.sort(key=lambda r: 0 if r.get("live") is True else (1 if r.get("live") is None else 2))
+    if req.reliability:
+        amap = _agentpulse_map()
+        for r in presented:
+            info = amap.get((r.get("name") or "").strip().lower())
+            r["agentpulse"] = (
+                {"live": info["live"], "uptime_pct": info["uptime_pct"], "source": "agentpulse"}
+                if info
+                else {"live": None, "uptime_pct": None, "source": "agentpulse", "note": "not tracked by AgentPulse"}
+            )
+        if req.only_live:
+            live = [r for r in presented if (r.get("agentpulse") or {}).get("live") is True]
+            presented = live or presented  # never return empty if AgentPulse had no data
+        # proven-live first, unknown next, confirmed-dead last
+        presented.sort(
+            key=lambda r: 0
+            if (r.get("agentpulse") or {}).get("live") is True
+            else (2 if (r.get("agentpulse") or {}).get("live") is False else 1)
+        )
     return {
         "status": "ok",
         "need": need,
         "count": len(presented),
         "verified_live": req.verify,
+        "reliability_checked": req.reliability,
         "results": presented,
         "next_step": "Open results[0].call_plan.skill_md_url, then run "
         "results[0].call_plan.suggested_first_call.example_curl.",

@@ -52,9 +52,18 @@ Search the registry by intent. This is the only call most agents need.
   host and ranks the ones that answer first, adding a `live` field per result. Use it
   when you want a service that is actually up right now. It is slower, so it is off by
   default.
+- `reliability` (bool, optional, default false): if true, Skill-Router cross-checks each
+  result against **AgentPulse** (the signed liveness/uptime oracle for the agent web) and
+  adds an `agentpulse` field per result — `{ "live": true/false, "uptime_pct": 98 }` —
+  ranking proven-live agents first. This routes you to services with a real track record,
+  not just a registry listing.
+- `only_live` (bool, optional, default false): with `reliability` true, drop results
+  AgentPulse reports as not live, so you only get callable agents.
 
 Results already prefer skills the registry reports as reachable (each result has a
 `reachable` field), so you are steered toward services that work even without `verify`.
+With `reliability`, Skill-Router closes the loop: discover a skill, then confirm it is
+actually alive before you call it.
 
 **Response** (`status: "ok"`)
 ```json
